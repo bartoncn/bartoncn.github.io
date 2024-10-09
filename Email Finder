@@ -1,0 +1,41 @@
+import pandas as pd
+import requests
+
+# Load the dealer contact list
+file_path = 'Dealer Contact List - 2024Oct.v2.xlsx'
+xls = pd.ExcelFile(file_path)
+df = xls.parse(xls.sheet_names[0])
+
+# SerpAPI settings (replace with your own API key)
+SERPAPI_KEY = '734de641fc87e9caf87f389126d2e9c6a2cb0100b123082ac2dfe1bf01306774'
+SEARCH_ENGINE = 'google'
+
+# Function to search Google for email addresses
+def search_email(dealer_name, contact_name):
+    query = f"{dealer_name} {contact_name} email"
+    url = f"https://serpapi.com/search.json?engine={SEARCH_ENGINE}&q={query}&api_key={SERPAPI_KEY}"
+    
+    response = requests.get(url)
+    if response.status_code == 200:
+        search_results = response.json()
+        for result in search_results.get('organic_results', []):
+            snippet = result.get('snippet', '').lower()
+            # Basic pattern matching for email
+            if '@' in snippet:
+                return snippet.split()[-1]  # Return email if found in snippet
+    return None
+
+# Loop through missing emails and attempt to find them
+for index, row in df.iterrows():
+    if pd.isna(row['Email Address']):
+        dealer_name = row['Dealer Name']
+        contact_name = row['Contact Name']
+        email = search_email(dealer_name, contact_name)
+        if email:
+            df.at[index, 'Email Address'] = email
+            print(f"Found email for {dealer_name}: {email}")
+        else:
+            print(f"No email found for {dealer_name}")
+
+# Save the updated file with found emails
+df.to_excel('Dealer_Contact_List_with_Emails.xlsx', index=False)
